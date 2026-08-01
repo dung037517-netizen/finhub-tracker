@@ -1,8 +1,8 @@
 <div align="center">
 
-# FinHub Tracker
+# FinHub Tracker — Student Finance Planning Web App
 
-**A quantitative risk analytics and portfolio dashboard — every figure computed in the browser.**
+**Plan four years of college the way an actuary would — every figure computed in your browser.**
 
 [![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js&logoColor=white)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
@@ -10,10 +10,11 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![Framer Motion](https://img.shields.io/badge/Framer_Motion-12-0055FF?style=flat-square&logo=framer&logoColor=white)](https://motion.dev)
 [![Recharts](https://img.shields.io/badge/Recharts-3-22B5BF?style=flat-square)](https://recharts.org)
-[![Tests](https://img.shields.io/badge/tests-49_passing-3fb950?style=flat-square&logo=vitest&logoColor=white)](./tests/finance-engine.test.ts)
+[![Tests](https://img.shields.io/badge/tests-63_passing-3fb950?style=flat-square&logo=vitest&logoColor=white)](./tests/finance-engine.test.ts)
+[![Monte Carlo](https://img.shields.io/badge/Monte_Carlo-1200_futures-8957e5?style=flat-square)](./lib/college-plan.ts)
 [![Finance libraries](https://img.shields.io/badge/finance_libraries-0-1f6feb?style=flat-square)](./lib/finance-engine.ts)
 
-[Live demo](https://finhubtracker-maudung.vercel.app) · [Risk engine](./lib/finance-engine.ts) · [Test suite](./tests/finance-engine.test.ts) · [MathForge →](https://github.com/dung037517-netizen/mathforge)
+[📊 **Live demo**](https://finhubtracker-maudung.vercel.app) · [Risk engine](./lib/finance-engine.ts) · [Test suite](./tests/finance-engine.test.ts) · [MathForge →](https://github.com/dung037517-netizen/mathforge)
 
 </div>
 
@@ -21,21 +22,75 @@
 
 ## What this is
 
-A portfolio dashboard where the analytics are the product. Value at Risk by four estimation
-methods, Black-Scholes-Merton pricing with a full second- and third-order Greek surface, Wilder's
-RSI, Bollinger bands, MACD, marginal risk contributions from the covariance matrix, and a streaming
-market feed — implemented from first principles in
-[`lib/finance-engine.ts`](./lib/finance-engine.ts), with **no financial library behind any of it**.
+A **student finance planning app** whose headline feature is a four-year college funding plan, and
+whose engine is real actuarial machinery rather than a spreadsheet formula.
 
-The engine is pure and total: every function either returns a value or a typed `FinanceError`.
-That is what makes a 49-case test suite possible without a browser, and it is why the dashboard can
-render a singular covariance matrix or an arbitrageable option quote as a message rather than as
-`NaN`.
+You give it a scenario — years until enrollment, current savings, monthly contribution, expected
+return, cost inflation, expected aid — and it inflates the costs forward, accumulates the savings as
+an **annuity-due**, draws them down semester by semester, and then stress-tests the whole thing
+against 1,200 simulated market futures to tell you the one number a family actually wants:
+*what is the chance this runs out?*
 
-> **On the data.** The tickers are fictitious and the price history is generated from a seeded
-> geometric Brownian motion. That is deliberate: it keeps every number in this README exactly
-> reproducible, and it avoids implying a market data licence this project does not hold. The
-> *methods* are real; the prices are not.
+Underneath, the same engine powers a full quantitative risk desk: Value at Risk by four estimation
+methods, Black-Scholes-Merton with a complete Greek surface, Wilder's RSI, and marginal risk
+contributions from the covariance matrix — implemented from first principles in
+[`lib/finance-engine.ts`](./lib/finance-engine.ts) and
+[`lib/college-plan.ts`](./lib/college-plan.ts), with **no financial library behind any of it**.
+
+> **On the data.** The tickers in the markets section are fictitious and their price history is
+> generated from a seeded geometric Brownian motion. That is deliberate: it keeps every number in
+> this README exactly reproducible, and avoids implying a market data licence this project does not
+> hold. The *methods* are real; the prices are not. College cost figures are round, illustrative
+> planning numbers — a family would substitute their own school's published cost of attendance.
+
+---
+
+## 💡 Actuarial Science & Math Foundation
+
+> **A college savings plan is a pension in miniature.**
+>
+> It has an accumulation phase, a decumulation phase, an inflation assumption, an investment return
+> assumption, and a solvency question at the end. Those are exactly the five ingredients of a
+> defined-benefit pension valuation — which is why the AP-level mathematics behind this app is the
+> same mathematics that prices retirement liabilities.
+>
+> | AP / high-school concept | How this app uses it |
+> |---|---|
+> | **Geometric sequences** | $C_k = C_0(1+g)^k$ inflates tuition forward. Compound growth, exactly as taught. |
+> | **Annuity accumulation** | $\ddot{s}_{\overline{n}} = \frac{(1+i)^n - 1}{i}(1+i)$ — the future value of a monthly contribution stream. The test suite pins the ledger against this closed form. |
+> | **Present value** | Costs are discounted back at the expected return to answer "what is four years of college worth *today*?" |
+> | **Exponential / logarithms** | $r_m = (1+r)^{1/12} - 1$ converts an annual rate to a monthly one that compounds back exactly. |
+> | **Normal distribution** (AP Stats) | Returns are lognormal, so $\ln$ returns are normal — the assumption behind both the fan chart and parametric VaR. |
+> | **Expected value & variance** | Expected shortfall is $\mathbb{E}[\text{loss} \mid \text{loss} > 0]$: a conditional expectation, straight off the AP Statistics formula sheet. |
+> | **Simulation** | 1,200 Monte Carlo futures turn a single point estimate into a distribution — the difference between "should be fine" and "fails 1 year in 5". |
+>
+> ### The insight the app is built to demonstrate
+>
+> Funding a plan to its **expected** return leaves roughly a **coin-flip** chance of falling short.
+> Not 10%, not 20% — about 50%.
+>
+> The reason is that the arithmetic mean of a lognormal return path sits *above* its median: the
+> average is dragged up by a thin upper tail that the typical investor never experiences. Planning
+> to the average therefore plans to an outcome most futures never reach.
+>
+> The app makes this concrete with two solve buttons. "Fund the expected case" solves the
+> deterministic break-even; "fund it 90% of the time" bisects on the *simulated shortfall
+> probability*. Across the three built-in scenarios the second costs **36–44% more per month**
+> (in-state $777 → $1,090; out-of-state $1,456 → $1,980; private $1,679 → $2,425).
+>
+> That gap is precisely what an actuarial **risk margin** is: the price of converting "probably
+> fine" into "fine nine times out of ten". It is large here because a plan already holding
+> significant savings carries five years of market exposure that contributions alone cannot offset.
+
+---
+
+## Zero cold start
+
+The dashboard loads fully populated: a complete four-year scenario is already projected, the Monte
+Carlo fan is drawn, two years of market history are charted, and the live feed is ticking. A
+**🚀 Explore the sample scenario** button in the hero resets to the flagship plan and scrolls to it.
+
+Measured cold load to network-idle: **~0.9 s**, with five charts rendered.
 
 ---
 
@@ -54,6 +109,14 @@ flowchart TB
         POS["Tax-lot position ledger"]
     end
 
+    subgraph PLAN["College planner — lib/college-plan.ts (pure)"]
+        COST["projectCollegeCosts()<br/><i>Cₖ = C₀(1+g)ᵏ</i>"]
+        LEDG["runSavingsLedger()<br/><i>annuity-due → decumulation</i>"]
+        SOLVE["requiredMonthlyContribution()<br/><i>bisection on min balance</i>"]
+        CONF["requiredContributionForConfidence()<br/><i>bisection on P(shortfall)</i>"]
+        MCP["assessCollegePlanRisk()<br/><i>1,200 futures → fan + VaR</i>"]
+    end
+
     subgraph ENGINE["Risk engine — lib/finance-engine.ts (pure)"]
         STAT["Descriptive statistics<br/><i>skew · kurtosis · covariance</i>"]
         SPEC["erf · Φ · Φ⁻¹ · logΓ"]
@@ -65,6 +128,7 @@ flowchart TB
     end
 
     subgraph VIEW["Dashboard — React 19"]
+        CP["college-planner.tsx<br/><i>headline scenario + fan chart</i>"]
         MC["market-chart.tsx<br/><i>candlestick · area · RSI</i>"]
         RD["risk-dashboard.tsx<br/><i>VaR · Greeks · allocation</i>"]
         PT["portfolio-table.tsx<br/><i>live marks, tick flashes</i>"]
@@ -84,6 +148,14 @@ flowchart TB
     SPEC --> VAR
     SPEC --> BS
     STAT --> PORT
+
+    COST --> LEDG --> SOLVE
+    LEDG --> MCP
+    MCP --> CONF
+    SPEC --> MCP
+    MCP --> CP
+    SOLVE --> CP
+    CONF --> CP
 
     TA --> MC
     PORT --> PT
@@ -124,6 +196,29 @@ however fast the feed runs.
 ---
 
 ## Financial formulas implemented
+
+### College funding (the headline model)
+
+Costs inflate geometrically from today's dollars, and the balance follows an annuity-due
+accumulation that switches into decumulation once bills land:
+
+$$C_k = C_0(1+g)^k, \qquad B_{t+1} = \bigl(B_t + PMT - W_t\bigr)(1 + r_m), \qquad r_m = (1+r)^{1/12} - 1$$
+
+With no withdrawals this reduces to the standard future value of an annuity-due, which is exactly
+what the test suite pins the ledger against:
+
+$$\ddot{s}_{\overline{n}|} = \frac{(1+i)^n - 1}{i}\,(1+i)$$
+
+Because contributions and withdrawals overlap once college starts, **there is no closed form** for
+the required payment. It is solved by bisection on the minimum balance across the ledger — a
+quantity monotone in $PMT$, so a bracketed search cannot diverge. The risk-adjusted version bisects
+on the simulated shortfall probability instead:
+
+$$PMT^{*}_{\alpha} = \inf\\{\,PMT : \mathbb{P}(\min_t B_t < 0) \le 1 - \alpha\,\\}$$
+
+Shortfall risk reuses the same coherent measures as the trading book, applied to a savings goal:
+
+$$\mathbb{E}[\text{shortfall}] = \mathbb{E}\left[-\min_t B_t \;\middle|\; \min_t B_t < 0\right]$$
 
 ### Value at Risk and Tail VaR
 
@@ -201,7 +296,7 @@ $\pm k$ sample standard deviations.
 ## Testing
 
 ```
-✓ 49 tests passing
+✓ 63 tests passing
 ```
 
 The suite pins the engine against values that can be checked independently:
@@ -222,6 +317,14 @@ The suite pins the engine against values that can be checked independently:
 | RSI on a monotone series | 100 up, 0 down, and $[0,100]$ on noise |
 | Weighted-average cost across two tax lots | hand-computed 60.00 |
 | Portfolio weights and risk contributions | each sums to 1 |
+| Ledger with no withdrawals | the annuity-due closed form $\ddot{s}_{\overline{n}}$ |
+| Monthly rate compounds back to the annual rate | exact to 12 decimals |
+| Money conservation: contributions + growth − withdrawals | equals the ending balance |
+| Cost inflation year over year | exactly $(1+g)$ per year |
+| Solved contribution | closes the funding gap to $\le\$1$ |
+| Confidence-funded contribution | strictly exceeds the deterministic one |
+| Higher volatility | strictly raises the shortfall probability |
+| Monte Carlo percentile bands | correctly ordered p10 ≤ p25 ≤ median ≤ p75 ≤ p90 |
 | Identical seeds produce identical series | reproducibility |
 
 ```bash
@@ -281,6 +384,7 @@ financeflow/
 │   └── globals.css               # oklch tokens, gain/loss semantics
 ├── components/
 │   ├── finance/
+│   │   ├── college-planner.tsx   # 4-year scenario, fan chart, shortfall VaR
 │   │   ├── market-chart.tsx      # candlestick · area · SMA · Bollinger · RSI
 │   │   ├── risk-dashboard.tsx    # VaR · Greeks · allocation
 │   │   ├── portfolio-table.tsx   # sortable, live tick flashes
@@ -291,6 +395,7 @@ financeflow/
 │   └── site/site-header.tsx
 ├── lib/
 │   ├── finance-engine.ts         # the whole quantitative core
+│   ├── college-plan.ts           # the student-facing planning engine
 │   ├── market-feed.ts            # WebSocket-shaped simulated feed
 │   ├── use-market-feed.ts        # frame-batched subscription hook
 │   ├── market-data.ts            # seeded universe and demo book

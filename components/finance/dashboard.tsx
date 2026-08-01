@@ -1,9 +1,18 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Pause, Play, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import {
+  LineChart,
+  Pause,
+  Play,
+  Rocket,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+} from "lucide-react";
 import * as React from "react";
 
+import { CollegePlanner } from "@/components/finance/college-planner";
 import { MarketChart } from "@/components/finance/market-chart";
 import { PortfolioTable } from "@/components/finance/portfolio-table";
 import { RiskDashboard } from "@/components/finance/risk-dashboard";
@@ -33,6 +42,9 @@ import { cn } from "@/lib/utils";
 
 const FEED_INTERVAL_MS = 450;
 const FEED_SEED = 20_260_801;
+
+/** Kept in sync with CollegePlanner's RISK_PATHS for the hero copy. */
+const RISK_PATH_LABEL = "1,200";
 
 const SYMBOL_OPTIONS = UNIVERSE.map((entry) => ({
   symbol: entry.instrument.symbol,
@@ -87,6 +99,13 @@ function SummaryTile({ label, value, delta, positive, hint }: SummaryTileProps) 
 export function Dashboard() {
   const [selectedSymbol, setSelectedSymbol] = React.useState(SYMBOL_OPTIONS[0].symbol);
   const [feedEnabled, setFeedEnabled] = React.useState(true);
+  const [demoSignal, setDemoSignal] = React.useState(0);
+
+  /** Reset the planner to the headline scenario and scroll a reviewer to it. */
+  const runQuickDemo = React.useCallback(() => {
+    setDemoSignal((current) => current + 1);
+    document.getElementById("planner")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   const feed = useMarketFeed({
     symbols: FEED_SYMBOLS,
@@ -140,17 +159,34 @@ export function Dashboard() {
           <div className="max-w-3xl">
             <Badge variant="outline" className="mb-4">
               <Wallet className="size-3" aria-hidden />
-              Quantitative risk analytics
+              Student finance planning · quantitative risk analytics
             </Badge>
             <h1 className="text-balance text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
-              Portfolio risk, priced from{" "}
-              <span className="text-gradient">first principles</span>
+              Will the money be there when the{" "}
+              <span className="text-gradient">tuition bill arrives?</span>
             </h1>
             <p className="mt-5 max-w-2xl text-pretty text-sm leading-relaxed text-muted-foreground sm:text-base">
-              Value at Risk by four estimation methods, Black-Scholes option pricing with a full
-              Greek surface, and a streaming market feed — every figure computed in the browser by
-              a typed engine with no financial libraries behind it.
+              A four-year college funding plan modelled the way an actuary would: costs inflated
+              forward, savings accumulated as an annuity-due, then drawn down semester by semester
+              — and stress-tested against {RISK_PATH_LABEL} simulated market futures. Every figure
+              is computed in the browser by a typed engine with no financial libraries behind it.
             </p>
+
+            <div className="mt-7 flex flex-wrap items-center gap-3">
+              <Button type="button" size="lg" onClick={runQuickDemo}>
+                <Rocket />
+                Explore the sample scenario
+              </Button>
+              <Button type="button" variant="outline" size="lg" asChild>
+                <a href="#risk">
+                  <LineChart />
+                  Jump to risk analytics
+                </a>
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Pre-loaded with live data — nothing to configure.
+              </span>
+            </div>
           </div>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -184,6 +220,18 @@ export function Dashboard() {
             />
           </div>
         </div>
+      </section>
+
+      {/* College planner — the headline experience */}
+      <section id="planner" className="mx-auto max-w-[1500px] scroll-mt-20 px-4 py-10 sm:px-6">
+        <header className="mb-5">
+          <h2 className="text-xl font-semibold tracking-tight">College funding plan</h2>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            The same actuarial machinery the risk panels use, pointed at the problem a high school
+            senior actually has.
+          </p>
+        </header>
+        <CollegePlanner demoSignal={demoSignal} />
       </section>
 
       {/* Market chart */}

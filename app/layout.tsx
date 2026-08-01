@@ -18,30 +18,58 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+const TITLE = "FinHub Tracker — Student Finance Planning Web App";
+const DESCRIPTION =
+  "Plan four years of college costs the way an actuary would: tuition inflated forward, savings " +
+  "accumulated as an annuity-due, then drawn down semester by semester — and stress-tested with " +
+  "Monte Carlo shortfall risk, Value at Risk and Black-Scholes analytics. Computed entirely in " +
+  "the browser by a typed, tested engine with no financial libraries.";
+const SITE_URL = "https://finhubtracker-maudung.vercel.app";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "FinHub Tracker — Quantitative Risk Analytics & Portfolio Dashboard",
+    default: TITLE,
     template: "%s · FinHub Tracker",
   },
-  description:
-    "A quantitative portfolio dashboard: Value at Risk and Tail VaR by four estimation methods, " +
-    "Black-Scholes option pricing with a full Greek surface, technical indicators, and a " +
-    "streaming market feed — all computed client-side from a typed, tested engine.",
+  description: DESCRIPTION,
+  applicationName: "FinHub Tracker",
+  authors: [{ name: "Dung Nguyen", url: "https://github.com/dung037517-netizen" }],
+  creator: "Dung Nguyen",
   keywords: [
+    "student finance planning",
+    "college savings calculator",
+    "529 projection",
+    "tuition inflation",
+    "Monte Carlo simulation",
     "Value at Risk",
     "expected shortfall",
     "Black-Scholes",
     "option Greeks",
-    "Sharpe ratio",
-    "portfolio risk",
+    "actuarial science",
     "quantitative finance",
-    "actuarial risk measures",
   ],
+  alternates: { canonical: "/" },
   openGraph: {
-    title: "FinHub Tracker — Quantitative Risk Analytics",
+    title: TITLE,
     description:
-      "VaR, TVaR, Black-Scholes Greeks and live portfolio analytics computed entirely in the browser.",
+      "A four-year college funding plan modelled with real actuarial mathematics — inflation-" +
+      "adjusted cash flows, annuity-due accumulation, and Monte Carlo shortfall risk.",
+    url: SITE_URL,
+    siteName: "FinHub Tracker",
     type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description:
+      "College funding modelled with actuarial mathematics: inflation-adjusted cash flows, " +
+      "annuity-due accumulation, and Monte Carlo shortfall risk.",
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 };
 

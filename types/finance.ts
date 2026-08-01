@@ -345,3 +345,125 @@ export interface MarketFeedConfig {
   readonly drift: Readonly<Record<string, number>>;
   readonly seed: number;
 }
+
+/* ------------------------------------------------------------------ */
+/* College financial planning                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A student's four-year college funding plan.
+ *
+ * Costs are quoted in *today's* dollars and inflated forward by
+ * `costInflation`; contributions and returns are applied monthly, which is how
+ * a real 529 or savings account actually compounds.
+ */
+export interface CollegePlanInput {
+  /** Label shown on the scenario card, e.g. "In-state public university". */
+  readonly scenarioName: string;
+  /** Years from today until the first tuition bill. */
+  readonly yearsUntilEnrollment: number;
+  /** Length of the degree programme in years. */
+  readonly programYears: number;
+  readonly currentSavings: number;
+  readonly monthlyContribution: number;
+  /** Expected annual return on invested savings, as a decimal. */
+  readonly expectedAnnualReturn: number;
+  /** Annualised volatility of those returns. */
+  readonly returnVolatility: number;
+  /** Annual growth rate of college costs — historically above CPI. */
+  readonly costInflation: number;
+
+  /** Annual sticker costs, in today's dollars. */
+  readonly annualTuition: number;
+  readonly annualRoomBoard: number;
+  readonly annualBooksSupplies: number;
+  readonly annualTravel: number;
+  /** One-off application-season budget (fees, tests, visits). */
+  readonly applicationBudget: number;
+  /** Expected annual grant and scholarship aid, in today's dollars. */
+  readonly expectedAnnualAid: number;
+}
+
+/** One academic year of projected, inflation-adjusted costs. */
+export interface CollegeCostYear {
+  /** 1-indexed academic year of the programme. */
+  readonly academicYear: number;
+  /** Whole years from today at which the bill lands. */
+  readonly yearsFromNow: number;
+  readonly tuition: number;
+  readonly roomBoard: number;
+  readonly booksSupplies: number;
+  readonly travel: number;
+  /** Grants and scholarships applied against the gross figure. */
+  readonly aid: number;
+  /** Gross cost before aid. */
+  readonly grossCost: number;
+  /** What the family actually pays. */
+  readonly netCost: number;
+}
+
+/** One month of the savings ledger. */
+export interface SavingsMonth {
+  readonly month: number;
+  readonly yearsFromNow: number;
+  readonly openingBalance: number;
+  readonly contribution: number;
+  readonly investmentReturn: number;
+  /** Tuition and living costs withdrawn this month, if any. */
+  readonly withdrawal: number;
+  readonly closingBalance: number;
+  /** Running total of money the family has put in. */
+  readonly cumulativeContributions: number;
+}
+
+/** Deterministic projection under the expected return. */
+export interface CollegePlanProjection {
+  readonly costs: readonly CollegeCostYear[];
+  readonly ledger: readonly SavingsMonth[];
+  /** Total nominal net cost across the programme. */
+  readonly totalNetCost: number;
+  /** Present value of those costs discounted at the expected return. */
+  readonly presentValueOfCosts: number;
+  /** Balance at the moment the first bill lands. */
+  readonly balanceAtEnrollment: number;
+  /** Balance after the final bill; negative means the plan ran dry. */
+  readonly endingBalance: number;
+  /** Shortfall in today's dollars, or 0 when the plan funds itself. */
+  readonly fundingGap: number;
+  /** Share of total cost the plan covers, in [0, 1]. */
+  readonly fundedRatio: number;
+  /** Monthly contribution that would exactly fund the plan. */
+  readonly requiredMonthlyContribution: number;
+  /** Total contributed by the family across the whole horizon. */
+  readonly totalContributions: number;
+  /** Total investment growth earned across the horizon. */
+  readonly totalInvestmentGrowth: number;
+}
+
+/** A percentile band of the balance path, for the Monte Carlo fan chart. */
+export interface BalanceBand {
+  readonly month: number;
+  readonly yearsFromNow: number;
+  readonly p10: number;
+  readonly p25: number;
+  readonly median: number;
+  readonly p75: number;
+  readonly p90: number;
+  /** The deterministic path, for comparison against the distribution. */
+  readonly expected: number;
+}
+
+/** Stochastic assessment of the same plan. */
+export interface CollegePlanRisk {
+  readonly paths: number;
+  /** Fraction of paths where the balance goes negative at any point. */
+  readonly shortfallProbability: number;
+  /** Mean shortfall across the paths that do fall short. */
+  readonly expectedShortfall: number;
+  /** 95%-confidence worst-case shortfall — VaR applied to a savings plan. */
+  readonly shortfallValueAtRisk: number;
+  /** Tail VaR: mean shortfall in the worst 5% of outcomes. */
+  readonly shortfallTailValueAtRisk: number;
+  readonly medianEndingBalance: number;
+  readonly bands: readonly BalanceBand[];
+}

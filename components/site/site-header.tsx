@@ -59,6 +59,7 @@ export function SiteHeader({ feedStatus, tickCount }: SiteHeaderProps) {
 
         <nav aria-label="Sections" className="ml-4 hidden items-center gap-1 md:flex">
           {[
+            { href: "#planner", label: "College plan" },
             { href: "#markets", label: "Markets" },
             { href: "#risk", label: "Risk" },
             { href: "#holdings", label: "Holdings" },
