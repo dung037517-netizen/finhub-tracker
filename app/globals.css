@@ -1,0 +1,283 @@
+@import "tailwindcss";
+@import "katex/dist/katex.min.css";
+
+/*
+ * FinHub Tracker design tokens.
+ *
+ * A trading-desk palette: near-black slate canvas, emerald/rose for the
+ * directional semantics that traders read pre-attentively, and a cyan accent
+ * for interactive affordances. Gain/loss colour is always paired with a sign
+ * or an arrow so the dashboard does not rely on hue alone.
+ */
+:root {
+  --background: oklch(0.14 0.014 240);
+  --foreground: oklch(0.965 0.005 240);
+
+  --surface: oklch(0.178 0.016 240);
+  --surface-raised: oklch(0.214 0.018 240);
+  --surface-sunken: oklch(0.156 0.015 240);
+
+  --card: oklch(0.178 0.016 240);
+  --card-foreground: oklch(0.965 0.005 240);
+
+  --popover: oklch(0.192 0.017 240);
+  --popover-foreground: oklch(0.965 0.005 240);
+
+  --primary: oklch(0.72 0.15 168);
+  --primary-foreground: oklch(0.14 0.014 240);
+
+  --secondary: oklch(0.248 0.02 240);
+  --secondary-foreground: oklch(0.94 0.007 240);
+
+  --accent: oklch(0.74 0.13 215);
+  --accent-foreground: oklch(0.14 0.014 240);
+
+  --muted: oklch(0.248 0.019 240);
+  --muted-foreground: oklch(0.7 0.02 240);
+
+  --destructive: oklch(0.65 0.2 22);
+  --destructive-foreground: oklch(0.98 0.008 22);
+
+  /* Directional semantics — used for P&L, price ticks, and risk breaches. */
+  --gain: oklch(0.74 0.16 158);
+  --loss: oklch(0.66 0.2 22);
+  --warning: oklch(0.8 0.15 82);
+  --success: oklch(0.74 0.16 158);
+
+  --border: oklch(0.29 0.019 240);
+  --input: oklch(0.29 0.019 240);
+  --ring: oklch(0.72 0.15 168);
+
+  --chart-1: oklch(0.72 0.15 168);
+  --chart-2: oklch(0.74 0.13 215);
+  --chart-3: oklch(0.8 0.15 82);
+  --chart-4: oklch(0.68 0.17 292);
+  --chart-5: oklch(0.66 0.2 22);
+  --chart-6: oklch(0.76 0.11 135);
+
+  --radius: 0.7rem;
+}
+
+[data-theme="light"] {
+  --background: oklch(0.985 0.003 240);
+  --foreground: oklch(0.2 0.016 240);
+
+  --surface: oklch(1 0 0);
+  --surface-raised: oklch(0.975 0.005 240);
+  --surface-sunken: oklch(0.955 0.007 240);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.016 240);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.016 240);
+
+  --primary: oklch(0.52 0.13 168);
+  --primary-foreground: oklch(0.99 0.004 168);
+
+  --secondary: oklch(0.945 0.008 240);
+  --secondary-foreground: oklch(0.28 0.018 240);
+
+  --accent: oklch(0.52 0.12 215);
+  --accent-foreground: oklch(0.99 0.004 215);
+
+  --muted: oklch(0.945 0.008 240);
+  --muted-foreground: oklch(0.47 0.017 240);
+
+  --destructive: oklch(0.55 0.21 22);
+  --destructive-foreground: oklch(0.99 0.008 22);
+
+  --gain: oklch(0.5 0.14 158);
+  --loss: oklch(0.54 0.2 22);
+  --warning: oklch(0.62 0.14 82);
+  --success: oklch(0.5 0.14 158);
+
+  --border: oklch(0.9 0.009 240);
+  --input: oklch(0.9 0.009 240);
+  --ring: oklch(0.52 0.13 168);
+
+  --chart-1: oklch(0.5 0.14 168);
+  --chart-2: oklch(0.52 0.12 215);
+  --chart-3: oklch(0.62 0.14 82);
+  --chart-4: oklch(0.5 0.17 292);
+  --chart-5: oklch(0.54 0.2 22);
+  --chart-6: oklch(0.56 0.11 135);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-gain: var(--gain);
+  --color-loss: var(--loss);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklch, var(--primary) 32%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  .numeric {
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+  }
+
+  .text-gain {
+    color: var(--gain);
+  }
+
+  .text-loss {
+    color: var(--loss);
+  }
+
+  .grid-backdrop {
+    background-image:
+      linear-gradient(
+        to right,
+        color-mix(in oklch, var(--border) 50%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in oklch, var(--border) 50%, transparent) 1px,
+        transparent 1px
+      );
+    background-size: 42px 42px;
+    mask-image: radial-gradient(ellipse 78% 58% at 50% 0%, #000 40%, transparent 100%);
+  }
+
+  .aurora {
+    background:
+      radial-gradient(
+        58rem 28rem at 8% -12%,
+        color-mix(in oklch, var(--primary) 22%, transparent),
+        transparent 62%
+      ),
+      radial-gradient(
+        48rem 24rem at 94% 4%,
+        color-mix(in oklch, var(--accent) 20%, transparent),
+        transparent 64%
+      );
+  }
+
+  .text-gradient {
+    background: linear-gradient(100deg, var(--foreground) 10%, var(--primary) 54%, var(--accent) 96%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  /* A brief flash applied to a price cell when a tick moves it. */
+  @keyframes tick-up {
+    0% {
+      background-color: color-mix(in oklch, var(--gain) 30%, transparent);
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
+
+  @keyframes tick-down {
+    0% {
+      background-color: color-mix(in oklch, var(--loss) 30%, transparent);
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
+
+  .tick-up {
+    animation: tick-up 0.6s ease-out;
+  }
+
+  .tick-down {
+    animation: tick-down 0.6s ease-out;
+  }
+}
+
+.katex {
+  color: inherit;
+  font-size: 1em;
+}
+
+.katex-display {
+  margin: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.15rem 0;
+}
