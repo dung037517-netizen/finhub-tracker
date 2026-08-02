@@ -1,42 +1,58 @@
 /**
- * FinHub Tracker — college financial planning engine.
+ * FinHub Tracker — Personal Asset-Liability Management (ALM) & Solvency Engine.
  * ============================================================================
  *
- * A four-year college funding plan is structurally a **pension in miniature**:
- * an accumulation phase, a decumulation phase, an inflation assumption, a
- * stochastic return assumption, and a solvency question at the end. This module
- * values it the way an actuary values a defined-benefit liability.
+ * A four-year college funding plan is not a savings calculator. It is a
+ * **defined-benefit liability** with a known payment schedule, funded by an
+ * asset portfolio of uncertain return. Framed that way, every tool a pension
+ * actuary uses applies directly:
  *
- * ## The three mathematical pillars
+ *   Liability stream  L = { W_t }   tuition, room, board — inflation-linked
+ *   Asset portfolio   A_t           savings, accumulated under stochastic return
+ *   Funding ratio     A_t / PV(L)   solvency at time t
+ *   Ruin event        min_t A_t < 0 the plan fails to meet a benefit payment
+ *
+ * ## Actuarial notation used throughout (International Actuarial Notation)
+ *
+ *   i      annual effective rate of interest
+ *   v      discount factor,            v = 1/(1+i)
+ *   d      rate of discount,           d = i/(1+i) = iv
+ *   δ      force of interest,          δ = ln(1+i)
+ *   ä(n|i) accumulated value of an annuity-due of 1 for n periods
+ *   BEL    Best Estimate Liability     (Solvency II / IFRS 17)
+ *   RM     Risk Margin                 loading above BEL for tail adequacy
+ *   TP     Technical Provision         TP = BEL + RM
+ *   CTE_α  Conditional Tail Expectation (SOA term for TVaR)
+ *
+ * ## The three actuarial pillars of this module
  *
  * **1. Annuity-due accumulation.** Contributions are made at the *start* of each
- * month, so each one earns a full month of interest. With no withdrawals the
- * ledger reduces exactly to the closed form
+ * month, so each earns a full period of interest. With no benefit outgo the
+ * ledger reduces exactly to the standard identity
  *
- *     s̈(n,i) = [((1 + i)^n − 1) / i] · (1 + i)
+ *     s̈(n|i) = [(1+i)^n − 1] / d,       d = i/(1+i)
  *
- * The `(1 + i)` factor is precisely what distinguishes an annuity-**due** from an
- * annuity-immediate. `tests/college-plan.test.ts` pins the ledger against this
- * identity, which is the single strongest guarantee that the accumulation logic
- * is correct.
+ * The discount rate d in the denominator — rather than i — is precisely what
+ * distinguishes an annuity-**due** from an annuity-immediate.
+ * `tests/college-plan.test.ts` pins the ledger against this identity, which is
+ * the strongest available guarantee that the accumulation logic is correct.
  *
- * **2. Bisection, not Newton-Raphson.** Once college starts, contributions and
- * withdrawals overlap, and the objective — the *minimum balance across the whole
- * ledger* — becomes piecewise-linear with kinks at every semester payment. It is
- * continuous and monotone in the contribution, but **not differentiable** at
- * those kinks, and flat over wide intervals. Newton needs f′; where f′ is
- * undefined or ~0 it diverges or overshoots. Bisection needs only a sign change
- * and monotonicity, both of which we have, so it *cannot* fail to converge.
- * See DERIVATION.md §3.
+ * **2. Bisection under a non-smooth liability profile.** The solvency objective
+ * — the minimum asset balance across the projection — is a pointwise minimum
+ * over a family of affine functions of the contribution. It is continuous and
+ * strictly monotone, but **kinked** wherever the binding constraint moves from
+ * one benefit payment date to another, and near-flat between kinks. Newton-
+ * Raphson requires a derivative that does not exist at those kinks and vanishes
+ * between them. Bisection requires only a sign change. See DERIVATION.md §3.
  *
- * **3. Lognormal returns and the median–mean gap.** Monthly returns are drawn as
- * exp(N(μ, σ²)) − 1. For a lognormal variable the median lies strictly *below*
- * the mean: the arithmetic average is inflated by a thin upper tail that the
- * typical path never visits. Funding a plan to its *expected* return therefore
- * leaves roughly a coin-flip chance of shortfall. Closing that gap to 90%
- * confidence is what actuaries call a **risk margin**. See DERIVATION.md §4.
+ * **3. Lognormal asset drift and the Risk Margin.** Asset returns are lognormal.
+ * For a lognormal variable the median lies strictly below the mean, so funding
+ * the plan to its **Best Estimate** leaves roughly a coin-flip probability of
+ * ruin. The loading required to reach a stated confidence level is a **Risk
+ * Margin** in the exact Solvency II sense. See DERIVATION.md §4.
  *
- * Every function here is pure and deterministic given its seed.
+ * Every function here is pure and deterministic given its seed — a requirement
+ * for model validation, not a convenience.
  */
 
 import { SeededRandom, sortedQuantile } from "@/lib/finance-engine";
@@ -54,13 +70,13 @@ import type {
 /* Constants                                                                  */
 /* ========================================================================== */
 
-/** Bills land at the start of each semester: month 0 and month 5 of the year. */
+/** Benefit payments fall due at the start of each semester: months 0 and 5. */
 const SEMESTER_OFFSETS = [0, 5] as const;
 
-/** Months per year — named so the intent is never ambiguous at a call site. */
+/** Periods per year. The projection runs on a monthly time step throughout. */
 const MONTHS_PER_YEAR = 12;
 
-/** Bisection stops when the bracket is narrower than this (dollars/month). */
+/** Solvency bisection halts once the contribution bracket is this narrow. */
 const CONTRIBUTION_TOLERANCE = 0.005;
 
 /** Hard iteration cap; bisection halves the bracket each pass, so this is ample. */
@@ -72,10 +88,10 @@ const MAX_CONFIDENCE_ITERATIONS = 22;
 /** Confidence solve stops once the bracket is narrower than this. */
 const CONFIDENCE_TOLERANCE = 5;
 
-/** Default Monte Carlo path count: stable percentiles, still fast enough to re-run. */
+/** Stochastic scenario count. 1,200 gives percentile bands stable to ~±1%. */
 export const DEFAULT_RISK_PATHS = 1200;
 
-/** Fixed default seed so every published figure is exactly reproducible. */
+/** Fixed seed: model reproducibility is a validation requirement (SR 11-7). */
 export const DEFAULT_SEED = 20_260_801;
 
 /* ========================================================================== */
@@ -161,14 +177,17 @@ export function validateCollegePlan(input: CollegePlanInput): Result<CollegePlan
 /* ========================================================================== */
 
 /**
- * Convert an annual effective rate to its monthly equivalent.
+ * Convert an annual effective rate of interest to its monthly equivalent.
  *
- *     r_m = (1 + r)^(1/12) − 1
+ *     (1 + i_m)^12 = 1 + i    ⟹    i_m = (1 + i)^(1/12) − 1
  *
- * This is the *effective* conversion, not the nominal shortcut `r / 12`. The
- * distinction matters: at r = 6%, r/12 = 0.5000% but the true monthly rate is
- * 0.4868%. Over a 60-month horizon the nominal shortcut overstates the final
- * balance by roughly 0.8% — small per month, compounding to real money.
+ * Equivalently, via the force of interest δ = ln(1 + i):  i_m = e^(δ/12) − 1.
+ *
+ * This is the **effective** conversion, not the nominal shortcut i/12. An
+ * actuary would call i/12 the nominal rate convertible monthly, i^(12), and it
+ * is a different quantity: at i = 6%, i/12 = 0.5000% but i_m = 0.4868%. Over a
+ * 60-month projection the nominal shortcut overstates the accumulated fund by
+ * roughly 0.8% — immaterial per period, material at the benefit payment date.
  */
 export function monthlyRate(annualRate: number): number {
   return Math.pow(1 + annualRate, 1 / MONTHS_PER_YEAR) - 1;
@@ -179,13 +198,18 @@ export function monthlyRate(annualRate: number): number {
 /* ========================================================================== */
 
 /**
- * Project each academic year's costs, inflated forward from today's dollars.
+ * Project the **liability stream** — each academic year's benefit outgo,
+ * inflated forward from today's dollars.
  *
  *     C_k = C_0 · (1 + g)^k
  *
- * Aid is inflated at the same rate as costs. That is the optimistic-but-
- * defensible assumption: holding aid flat in nominal terms would quietly widen
- * the funding gap every year and overstate the required contribution.
+ * This is an inflation-linked liability, structurally identical to an indexed
+ * pension benefit: the nominal amount is unknown today and grows with a stated
+ * index, so the plan bears **inflation risk** on top of investment risk.
+ *
+ * Aid is indexed at the same rate g. That is the optimistic-but-defensible
+ * assumption; holding aid flat in nominal terms would quietly inflate the net
+ * liability each year and overstate the required contribution.
  */
 export function projectCollegeCosts(input: CollegePlanInput): CollegeCostYear[] {
   const years: CollegeCostYear[] = [];
@@ -265,7 +289,10 @@ function withdrawalSchedule(
 /* ========================================================================== */
 
 /**
- * Run the savings ledger month by month.
+ * Project the asset portfolio against the liability stream, period by period.
+ *
+ * This is the ALM projection: assets accumulate, benefits fall due, and the
+ * question at every step is whether the fund remains solvent.
  *
  * `returns(month)` supplies that month's return: pass a constant for the
  * deterministic projection, or sampled values for one Monte Carlo path. Keeping
@@ -329,7 +356,13 @@ export function runSavingsLedger(
   return ledger;
 }
 
-/** The lowest closing balance the ledger ever reaches — the objective we solve on. */
+/**
+ * The minimum asset balance across the whole projection.
+ *
+ * This is the **solvency objective**. A plan is adequate if and only if this
+ * quantity is non-negative: a fund that dips below zero has failed to meet a
+ * benefit payment on its due date, regardless of what it recovers to later.
+ */
 function minimumBalance(ledger: readonly SavingsMonth[]): number {
   let lowest = Number.POSITIVE_INFINITY;
   for (const entry of ledger) {
@@ -343,7 +376,12 @@ function minimumBalance(ledger: readonly SavingsMonth[]): number {
 /* ========================================================================== */
 
 /**
- * Solve for the monthly contribution that exactly funds the plan.
+ * Solve for the contribution that funds the **Best Estimate Liability** exactly.
+ *
+ * In Solvency II language this is the BEL-funding contribution: the level
+ * premium that makes the plan exactly adequate under the *expected* return
+ * assumption, with **no risk margin**. It is the correct starting point and,
+ * on its own, an inadequate answer — see `requiredContributionForConfidence`.
  *
  * ## Why bisection and not Newton-Raphson
  *
@@ -415,7 +453,12 @@ export function requiredMonthlyContribution(input: CollegePlanInput): number {
 /* ========================================================================== */
 
 /**
- * Stress-test the plan across many simulated market futures.
+ * Stochastic solvency assessment — the plan's Own Risk and Solvency Assessment.
+ *
+ * Projects the fund across many economic scenarios and reports the distribution
+ * of outcomes rather than a point estimate. This is what converts "the plan
+ * works" into "the plan works in 79% of futures, and when it fails the median
+ * deficit is $X".
  *
  * ## The stochastic model
  *
@@ -548,11 +591,15 @@ export function assessCollegePlanRisk(
 /* ========================================================================== */
 
 /**
- * Solve for the contribution that funds the plan with a target **confidence**,
- * not merely on average.
+ * Solve for the contribution that funds the **Technical Provision** — the Best
+ * Estimate Liability *plus* a Risk Margin sized to a stated confidence level.
+ *
+ *     TP = BEL + RM
  *
  * This is the single most important function in the module, and the difference
- * between a spreadsheet and an actuarial reserve.
+ * between a spreadsheet and an actuarial reserve. Solvency II, IFRS 17 and the
+ * Swiss Solvency Test all require exactly this loading: a provision set at the
+ * best estimate is adequate roughly half the time, which no regulator accepts.
  *
  * Funding to the expected return leaves roughly a **coin flip** chance of falling
  * short, because the median of a lognormal path sits below its mean. Reaching 90%
@@ -614,12 +661,14 @@ export function requiredContributionForConfidence(
 /* ========================================================================== */
 
 /**
- * Project the plan under the expected return and summarise it.
+ * Deterministic ALM projection under the Best Estimate assumptions.
  *
- * The funding gap is measured at the plan's point of **greatest strain** — the
- * deepest the balance ever goes underwater — not at the ending balance. A plan
- * that runs dry in year three and recovers by graduation has still failed the
- * family in year three; reporting only the final figure would hide that entirely.
+ * The solvency deficit is measured at the point of **greatest strain** — the
+ * deepest the fund goes underwater — not at the terminal balance. A plan that
+ * exhausts its assets in year three and recovers by graduation has still
+ * defaulted on a benefit payment in year three. Reporting only the terminal
+ * position would hide a genuine insolvency event, which is precisely the error
+ * a run-off projection exists to prevent.
  */
 export function projectCollegePlan(input: CollegePlanInput): CollegePlanProjection {
   const rate = monthlyRate(input.expectedAnnualReturn);
