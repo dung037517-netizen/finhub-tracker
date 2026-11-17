@@ -19,6 +19,7 @@ import {
   usdToHome,
 } from "@/lib/planner/costs";
 import { CATEGORY_LABELS, CATEGORY_ORDER, feeAmount, findFee, REFERENCE_FEES } from "@/lib/planner/fees";
+import { normalQuantile } from "@/lib/finance-engine";
 import { formatMoney, formatShare, parseAmount } from "@/lib/planner/format";
 import { goalStatus, monthlyGoalCommitment } from "@/lib/planner/goals";
 import {
@@ -533,6 +534,13 @@ describe("savings goals", () => {
     expect(overdue.requiredMonthly).toBe(900);
   });
 
+  it("does not call a goal without a target reached", () => {
+    const unset = goalStatus({ ...goal, target: 0, saved: 0 }, "2026-09");
+    expect(unset.state).toBe("unset");
+    expect(unset.progress).toBe(0);
+    expect(monthlyGoalCommitment([{ ...goal, target: 0, monthly: 500 }], "2026-09")).toBe(0);
+  });
+
   it("adds up what unfinished goals take each month", () => {
     const goals: Goal[] = [goal, { ...goal, id: "h", saved: 1200, monthly: 500 }, { ...goal, id: "i", deadline: "2026-01", monthly: 70 }];
     expect(monthlyGoalCommitment(goals, "2026-09")).toBe(150);
@@ -563,6 +571,28 @@ describe("formatting", () => {
 describe("saved plans", () => {
   const sample = buildSamplePlan(new Date(2026, 10, 16, 10).getTime());
 
+  it("pins the worked example in DERIVATION.md section 6.1", () => {
+    const distribution = costDistribution(sample.costs);
+    expect(distribution.baseUsd).toBe(1551);
+    expect(distribution.groups.map((group) => [group.usd, group.probability])).toEqual([
+      [1021, 0.75],
+      [250, 0.5],
+      [111, 0.4],
+    ]);
+    expect(distribution.expectedUsd).toBeCloseTo(2486.15, 6);
+    expect(distribution.scenarios.map((scenario) => scenario.usd)).toEqual([1551, 1662, 1801, 1912, 2572, 2683, 2822, 2933]);
+    expect(distribution.p90Usd).toBe(2933);
+    expect(distribution.worstUsd).toBe(2933);
+    const sd = Math.sqrt(
+      distribution.groups.reduce((total, group) => total + group.probability * (1 - group.probability) * group.usd ** 2, 0),
+    );
+    expect(sd).toBeCloseTo(462.644, 2);
+    // The normal approximation asks for more than the worst case that can occur.
+    const normal = distribution.expectedUsd + normalQuantile(0.9) * sd;
+    expect(Math.round(normal)).toBe(3079);
+    expect(normal - distribution.worstUsd).toBeGreaterThan(145);
+  });
+
   it("builds a coherent example plan", () => {
     expect(sample.sample).toBe(true);
     expect(sample.settings.startMonth).toBe("2026-11");
@@ -572,9 +602,15 @@ describe("saved plans", () => {
     expect(sample.transactions.every((entry) => entry.date <= "2026-11-16")).toBe(true);
     expect(new Set(sample.transactions.map((entry) => entry.id)).size).toBe(sample.transactions.length);
     expect(buildSamplePlan(new Date(2026, 10, 16, 10).getTime())).toEqual(sample);
-    // The example is meant to teach something: it holds if nothing goes wrong, and not otherwise.
+    // The example is meant to teach something: it holds on the best estimate,
+    // not if every contingency happens, and the repair is set by one month.
     expect(projectCashFlow(sample, "planned").firstShortfall).toBeNull();
+    expect(projectCashFlow(sample, "expected").firstShortfall).toBeNull();
     expect(projectCashFlow(sample, "prudent").firstShortfall).not.toBeNull();
+    const repair = requiredMonthlySaving(sample, "prudent");
+    expect(repair.bindingMonth).toBe("2027-06");
+    expect(repair.amount).toBeGreaterThan(0);
+    expect(repair.amount).toBeLessThan(2_000_000);
     expect(costDistribution(sample.costs).marginUsd).toBeGreaterThan(0);
   });
 

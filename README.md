@@ -2,19 +2,20 @@
 
 # FinHub Tracker
 
-### A Personal Asset-Liability Management & Solvency Framework
+### Student finance planning for the year of applying to U.S. colleges
 
-**Treating four years of university as a defined-benefit liability, and funding it
-the way a pension actuary would.**
+**A budgeting, savings-goal and cash-flow planner built on the real cost structure of a
+U.S. college application — every test, score report, application fee, financial-aid
+form, deposit and visa fee, in the month it falls due and in your own currency.**
 
 [![CI](https://github.com/dung037517-netizen/finhub-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/dung037517-netizen/finhub-tracker/actions/workflows/ci.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)](./tsconfig.json)
-[![Actuarial libraries](https://img.shields.io/badge/actuarial_libraries-0-1f6feb?style=flat-square)](./lib/college-plan.ts)
+[![Actuarial libraries](https://img.shields.io/badge/actuarial_libraries-0-1f6feb?style=flat-square)](./lib/planner)
 
-[**Live demo**](https://finhubtracker-maudung.vercel.app) ·
+[**Live app**](https://finhubtracker-maudung.vercel.app) ·
+[**Method and sources**](https://finhubtracker-maudung.vercel.app/method) ·
 [**Actuarial derivations**](./DERIVATION.md) ·
-[**Model risk log**](./POSTMORTEM.md) ·
-[**Engine**](./lib/college-plan.ts)
+[**Model risk log**](./POSTMORTEM.md)
 
 </div>
 
@@ -22,21 +23,97 @@ the way a pension actuary would.**
 
 ## The problem
 
-My family could not answer a question that mattered: *can we afford four years of
-university abroad?*
+Applying to U.S. colleges from abroad is not one payment. It is a dozen separate
+charges in dollars — the College Board, the testing agencies, each college, the CSS
+Profile, the Student and Exchange Visitor Program, the State Department — spread over
+about a year. Some of them may never be needed: under binding Early Decision, the
+regular-round applications are paid only if the early one does not end in an offer.
 
-A spreadsheet gives one number, and that number is a lie of omission. It cannot
-express **uncertainty**. It says "you will have $104,000" when the honest answer
-is "you will have somewhere between $60,000 and $150,000, and the probability
-you fail to meet a tuition payment in year three is 21%."
+A spreadsheet total hides the two things that decide whether a plan works:
 
-So I stopped treating it as a savings problem and modelled it as what it
-structurally is: a **defined-benefit liability funded by a risky asset
-portfolio** — an ALM problem, valued with pension and life-insurance technique.
+- **Timing.** Income arrives evenly; application costs do not. A quiet autumn is
+  followed by several hundred dollars in one week of December. A plan can balance over
+  the year and still run dry in the month the bills land together.
+- **Uncertainty.** Retakes, extra applications and the exchange rate are not known in
+  advance. One number cannot say how much to hold back for them.
+
+FinHub Tracker models both, from the student's side of the table.
 
 ---
 
-## The actuarial framing
+## What it does
+
+| | |
+|---|---|
+| **Application costs** | Reference fees for the 2025–26 cycle, each linked to the organization that sets it. Nine questions — colleges, Early Decision and your own estimate of early admission, SAT sittings and retake chance, AP exams, English tests, CSS Profile colleges, visa — draft the whole schedule on the application calendar. Anything that may not happen carries a probability. |
+| **Cost distribution** | The exact distribution of what is still to pay: the expected total, the amount that is enough in 9 outcomes out of 10, and the risk margin between them. |
+| **Cash flow** | The balance at the end of every month from today to the first day of university, read three ways — planned payments only, expected, and prudent (every contingency happens). It finds the first month in the red, the smallest level monthly saving that repairs the plan, the month that sets that figure, and what a stronger dollar does to all of it. |
+| **Budget** | A monthly budget by category against recorded spending, the savings rate, and the last six months. |
+| **Savings goals** | Target, deadline and monthly amount give the level saving that arrives on time, whether you are on track, and when you will get there. Goal contributions are taken out of the cash flow, so the two always agree. |
+| **Transactions** | Income and spending in your own currency, CSV export, and a one-click import of anything recorded in the first version of the app. |
+| **Your data** | Stored only in your browser. No account, no server, no analytics. A JSON backup moves a plan between devices. |
+
+The app opens on an invented example applicant, labelled as one on every screen, so
+there is something to read before you enter anything. **Start blank** clears it.
+
+---
+
+## The mathematics
+
+### The cost of applying is an individual risk model
+
+Let $B$ be what is certain and still unpaid, and let contingency $j$ cost $c_j$ with
+probability $p_j$. The total still to pay is
+
+$$T = B + \sum_{j=1}^{k} c_j X_j, \qquad X_j \sim \text{Bernoulli}(p_j) \text{ independent},$$
+
+which is the **individual risk model** of loss models, with a fixed amount in place of
+a claim-size distribution. Items that stand or fall together — the regular-round
+applications, their score reports and CSS Profiles, all needed only if Early Decision
+fails — form one contingency.
+
+The planner computes the distribution of $T$ **exactly**, by enumerating all $2^k$
+outcomes and merging equal totals, then reports $\mathbb{E}[T]$, the 90th percentile
+$t_{0.9}$, and the **risk margin** $t_{0.9} - \mathbb{E}[T]$.
+
+It does not use the normal approximation, and the example plan (as built in November
+2026) shows why. With three lumpy contingencies — the regular round ($1,021 at 75%), the visa integrity fee ($250
+at 50%) and an SAT retake ($111 at 40%) on a certain base of $1,551:
+
+| | 90th percentile |
+|---|---:|
+| Exact distribution | **$2,933** (every contingency happens) |
+| Normal approximation, $\mathbb{E}[T] + 1.2816\,\sigma_T$ | $3,079 — **$146 above the largest total that can occur** |
+
+The central limit theorem needs many small risks. An application year has a handful of
+large ones. [Derivation →](./DERIVATION.md#61-the-cost-of-applying-as-an-individual-risk-model)
+
+### The month that binds
+
+With month-end balances $S_1, \dots, S_n$, saving an extra $m$ every month from now
+raises $S_t$ by $t\,m$. The plan holds when $S_t + t\,m \ge 0$ for every $t$, so the
+smallest level saving that repairs it is
+
+$$m^{*} = \max\Big(0,\ \max_{t}\ \frac{-S_t}{t}\Big).$$
+
+The month that attains the maximum is the **binding month**. The figure is set by when
+the money is short, not by the year's total: the same deficit costs four times as much
+a month if it falls in month 2 as in month 8. [Proof →](./DERIVATION.md#62-the-smallest-level-saving-and-the-binding-month)
+
+### Exchange-rate stress
+
+A cost of $c$ dollars at $r$ home units per dollar, with the dollar assumed $s$
+stronger, is $c\,r\,(1+s)$ at home. The lowest balance is then a minimum of affine
+functions of $s$ — concave and piecewise linear — so it falls at least linearly, and
+faster once a later month with more dollar costs becomes the binding one.
+
+---
+
+## The four-year model: college funding as a pension problem
+
+The planner stops at enrollment. The [**College funding**](https://finhubtracker-maudung.vercel.app/funding)
+page models the four years after it as what they structurally are: a
+**defined-benefit liability funded by a risky asset portfolio**.
 
 | Household object | Actuarial object |
 |---|---|
@@ -46,169 +123,121 @@ portfolio** — an ALM problem, valued with pension and life-insurance technique
 | Fund fails to meet a payment | **Ruin event**, $\min_t A_t < 0$ |
 | Contribution at expected return | Funding the **Best Estimate Liability** |
 | Extra loading for confidence | **Risk Margin** |
-| BEL + Risk Margin | **Technical Provision** |
 
-The plan has an **accumulation phase**, a **decumulation phase**, an inflation
-assumption, a stochastic return assumption, and a solvency test at every payment
-date. Those are the five ingredients of a defined-benefit valuation. Nothing here
-is a metaphor — the mathematics is identical, only the scale differs.
+Savings accumulate as an annuity-due and are drawn down semester by semester; returns
+are lognormal and tested over 1,200 simulated futures.
 
----
+**The finding: funding the plan to its best estimate leaves roughly a coin-flip
+probability of ruin.** For a lognormal return the median lies strictly below the mean,
 
-## The finding
+$$\frac{\mathbb{E}[Y]}{\text{Median}(Y)} = e^{\sigma^2/2} > 1,$$
 
-> **Funding the plan to its Best Estimate leaves roughly a coin-flip probability
-> of ruin.**
+so funding to the average funds an outcome most futures never reach. Closing the gap to
+90% confidence takes a risk margin of 36–44%:
 
-Not 10%. About 50%.
-
-Asset returns are lognormal, and for a lognormal variable the **median lies
-strictly below the mean**:
-
-$$\frac{\mathbb{E}[Y]}{\text{Median}(Y)} = e^{\sigma^2/2} > 1$$
-
-The arithmetic average is inflated by a thin upper tail the typical scenario
-never visits. Funding to the average is funding to an outcome most futures never
-reach — which is precisely why **Solvency II does not permit a technical
-provision set at best estimate.**
-
-Closing that gap to 90% confidence requires a Risk Margin of **36–44%**:
-
-| Scenario | $P^\star$ (BEL) | $P_{0.90}$ (Technical Provision) | Risk Margin |
+| Scenario | $P^\star$ (best estimate) | $P_{0.90}$ (90% confidence) | Risk Margin |
 |---|---:|---:|---:|
 | In-state public | $777/mo | $1,090/mo | **+40%** |
 | Out-of-state public | $1,456/mo | $1,980/mo | **+36%** |
 | Private | $1,679/mo | $2,425/mo | **+44%** |
 
-That loading is a Risk Margin in the exact Solvency II and IFRS 17 sense: the
-provision above best estimate that converts *"probably adequate"* into
-*"adequate with stated confidence."*
-[Full derivation →](./DERIVATION.md#4-lognormal-asset-returns-and-the-risk-margin)
+The presets use typical published costs for U.S. residents; international students pay
+out-of-state tuition at public universities and usually receive less need-based aid.
+
+**What holds the engine together:**
+
+1. **The ledger is anchored to a closed-form identity.** With no withdrawals it must
+   equal $\ddot{s}_{\overline{n}\rvert i} = \frac{(1+i)^n - 1}{d}$ exactly, which also
+   proves the annuity is *due* rather than immediate.
+2. **Zero volatility tests the drift correction.** At $\sigma = 0$ every percentile must
+   collapse onto the deterministic projection. Omit the $-\sigma^2/2$ term and this test
+   fails while every other test passes.
+3. **A fixed seed makes the risk-margin solver converge.** Bisection on a noisy Monte
+   Carlo objective flips on sampling error; a fixed seed makes the ruin probability a
+   deterministic, monotone step function.
+4. **Solvency is tested at every payment date.** A fund that is empty in year three and
+   recovers by graduation has still missed a tuition payment.
+5. **CTE, not VaR alone.** VaR is not subadditive; Conditional Tail Expectation
+   satisfies all four coherence axioms of Artzner et al.
+
+The full working is in [`DERIVATION.md`](./DERIVATION.md), and the errors I made along
+the way, with their root causes, are in [`POSTMORTEM.md`](./POSTMORTEM.md).
+
+---
+
+## Market lab
+
+A sandbox for the risk engine on **simulated** data, and labelled as such: Value at Risk
+four ways (historical, parametric, Cornish–Fisher and Monte Carlo), Black–Scholes prices
+with their Greeks, implied volatility, and technical indicators. The portfolio is
+invented and the prices come from a seeded geometric Brownian motion, so every figure is
+reproducible and nothing implies a market-data licence this project does not hold.
+
+---
+
+## Verification
+
+```
+147 tests · 3 suites
+  planner          49   fees, cost distribution, cash flow, budget, goals, storage
+  college funding  49   closed-form annuity identities, zero-volatility collapse, solvers
+  risk engine      49   pinned against textbook values
+```
+
+CI runs the type checker, the linter, the tests and a production build on every push to
+`main` and every pull request, and fails if `any` appears anywhere in the source.
+
+---
+
+## Project structure
+
+```
+app/                   routes: / (planner) · /funding · /lab · /method
+components/planner/    the planner's tabs and inputs
+components/finance/    the college funding model and the market lab
+lib/planner/           fees · costs · cashflow · budget · goals · storage — pure functions, no React
+lib/college-plan.ts    the four-year funding engine
+lib/finance-engine.ts  risk analytics
+tests/                 vitest suites
+```
+
+The planning logic in `lib/planner/` is plain TypeScript with no React, so every number
+on the screen comes from a function with a test.
 
 ---
 
 ## How This Was Built & Transparency Statement
 
-This project was built with substantial AI assistance (Claude), and the git
-history shows that openly — most of the initial implementation was AI-authored.
+This project was built with substantial AI assistance (Claude), and the git history
+shows that openly — most of the implementation of both versions was AI-authored. The
+first version was the college funding model; the second, in November 2026, added the
+application-year planner.
 
-I state this plainly because the alternative is worse. A reviewer can read the
-commit log in thirty seconds, and a portfolio that hides how it was made is not
-evidence of anything.
+I state this plainly because the alternative is worse. A reviewer can read the commit
+log in thirty seconds, and a portfolio that hides how it was made is not evidence of
+anything.
 
 What I claim is narrower, and checkable:
 
-- **I chose the problem.** This model exists because my own family could not
-  answer whether four years abroad was affordable, and no spreadsheet could
-  express the uncertainty honestly.
-- **I own the actuarial mathematics.** [`DERIVATION.md`](./DERIVATION.md) works
-  through every result the engine depends on in International Actuarial
-  Notation — the annuity-due identity $\ddot{s}_{\overline{n}\rvert i} =
-  \frac{(1+i)^n-1}{d}$, a proof that the solvency objective is monotone but
-  non-differentiable, and the lognormal median–mean gap that makes a Risk Margin
-  unavoidable. It also documents **five model limitations I have not resolved.**
-- **I own the model risk record.** [`POSTMORTEM.md`](./POSTMORTEM.md) analyses
-  five incidents under the MRM framework, including a disclosed Risk Margin that
-  was wrong by a factor of three, and a validation oracle that was itself
-  incorrect.
-- **I can defend every design decision.** Ask me why bisection rather than
-  Newton-Raphson: the solvency objective is a pointwise minimum over a family of
-  affine functions, so it is continuous and strictly monotone but **kinked**
-  wherever the binding payment date moves. Newton requires a derivative that does
-  not exist at those kinks and vanishes on the flat stretches between them.
-  Bisection needs only a sign change, and cannot diverge.
+- **I chose the problem.** The planner follows the costs of my own application year,
+  in the order they arrive.
+- **I own the mathematics.** [`DERIVATION.md`](./DERIVATION.md) works through every
+  result the code depends on — the annuity-due identity, why the solvency objective is
+  monotone but not differentiable, the lognormal median–mean gap, and, for the planner,
+  the individual risk model and the binding-month result — and documents the
+  limitations I have not resolved.
+- **I own the model risk record.** [`POSTMORTEM.md`](./POSTMORTEM.md) analyses the
+  errors under a model risk management framework, including a disclosed risk margin
+  that was wrong by a factor of three.
+- **I can defend the design decisions.** Why enumerate the cost distribution instead of
+  using a normal approximation? Because with three lumpy contingencies the
+  approximation puts the 90th percentile above the worst case that can occur. Why does
+  one month, not the year's total, set the extra saving? Because each month's balance
+  is a separate constraint, and an early deficit has fewer months to be saved for.
 
-Using AI to build past my current ability, then working backwards until I
-understood what it built, was a deliberate choice about how to learn quickly. I
-would rather be judged on that than on a smaller project I could have written
-alone.
-
----
-
-## Architecture
-
-```mermaid
-flowchart TB
-    subgraph IN["Assumption set"]
-        SC["CollegePlanInput<br/><i>benefit basis · assets · i · g · σ · aid</i>"]
-    end
-
-    subgraph VAL["Validation"]
-        V["validateCollegePlan()<br/><i>Result&lt;T, FinanceError&gt;</i><br/>rejects i ≤ −100% → NaN"]
-    end
-
-    subgraph LIAB["Liability side"]
-        COST["projectCollegeCosts()<br/><i>Cₖ = C₀(1+g)ᵏ</i><br/>inflation-linked benefit stream"]
-    end
-
-    subgraph ASSET["Asset side"]
-        RATE["monthlyRate()<br/><i>iₘ = (1+i)^(1/12) − 1 = e^(δ/12) − 1</i>"]
-        LEDG["runSavingsLedger()<br/><i>annuity-due accumulation<br/>→ decumulation</i><br/>returns injected as a function"]
-    end
-
-    subgraph SOLV["Solvency"]
-        BEL["requiredMonthlyContribution()<br/><i>BEL-funding premium</i><br/>bisection on min Aₜ"]
-        MC["assessCollegePlanRisk()<br/><i>1,200 lognormal scenarios</i><br/>−σ²/2 drift correction"]
-        RM["requiredContributionForConfidence()<br/><i>Technical Provision = BEL + RM</i><br/>bisection on P(ruin), fixed seed"]
-    end
-
-    subgraph OUT["Valuation output"]
-        PROJ["CollegePlanProjection<br/><i>solvency deficit · funding ratio · PV</i>"]
-        RISK["CollegePlanRisk<br/><i>P(ruin) · E[shortfall] · VaR · CTE · fan</i>"]
-    end
-
-    SC --> V --> COST
-    RATE --> LEDG
-    COST --> LEDG
-    LEDG --> BEL
-    LEDG --> MC
-    MC --> RM
-    BEL --> PROJ
-    MC --> RISK
-```
-
-**The design decision that matters:** `runSavingsLedger` takes returns as an
-**injected function**, not a fixed rate. The deterministic valuation passes a
-constant; the stochastic valuation passes sampled values. One ledger serves both
-— so there is no second implementation that could drift out of agreement with
-the first. In MRM terms, a single validated computational kernel rather than two
-models requiring reconciliation.
-
----
-
-## System insights
-
-**1. The ledger is anchored to a closed-form actuarial identity.**
-With benefit outgo removed it must equal $\ddot{s}_{\overline{n}\rvert i} =
-\frac{(1+i)^n - 1}{d}$ exactly, where $d = i/(1+i)$ is the rate of discount.
-That single test is the strongest guarantee the accumulation logic is right, and
-it also confirms the annuity is **due** rather than immediate — the two differ
-by a factor of exactly $(1+i)$.
-
-**2. Zero volatility is the strongest test of the drift correction.**
-At $\sigma = 0$ the lognormal degenerates to its drift, so **every percentile
-must collapse onto the deterministic projection**. Omit the $-\sigma^2/2$ term
-and this test fails immediately — while no other test in the suite would catch
-it, and every reported solvency figure would be optimistic.
-
-**3. Fixing the simulation seed is what makes the Risk Margin solver converge.**
-Bisecting on a *noisy* Monte Carlo objective oscillates: the sign test flips on
-sampling error rather than at the true crossing. A fixed seed turns the ruin
-probability into a deterministic monotone step function. Reproducibility here is
-a mathematical requirement, not merely good governance.
-
-**4. Solvency is tested at every payment date, not at run-off.**
-A fund that exhausts its assets in year three and recovers by graduation has
-still defaulted on a benefit payment in year three. The deficit is measured at
-the point of greatest strain, $\min_t A_t$ — reporting only the terminal position
-would conceal a genuine insolvency event.
-
-**5. CTE, not VaR alone.**
-VaR is not subadditive: it can assert that diversification increases risk. CTE
-(Conditional Tail Expectation) satisfies all four coherence axioms of Artzner et
-al., which is why Solvency II and the SOA syllabus are built on it. A 5% chance
-of a \$2,000 deficit and a 5% chance of a \$90,000 deficit have identical VaR and
-utterly different CTE.
+Using AI to build past my current ability, then working backwards until I understood
+what it built, was a deliberate choice about how to learn quickly. I would rather be
+judged on that than on a smaller project I could have written alone.
 
 ---
 
@@ -220,31 +249,27 @@ cd finhub-tracker
 npm install
 
 npm run dev        # http://localhost:3000
-npm test           # 98 tests
+npm test           # 147 tests
 npm run typecheck  # tsc --noEmit, strict
 npm run lint
 npm run build
 ```
 
-Requires Node.js 20+.
+Requires Node.js 20 or later.
 
 ---
 
-## Assumption basis and disclosure
+## Assumptions and disclosure
 
-Market tickers in the portfolio section are **fictitious** and their history is
-generated from a seeded geometric Brownian motion. This is deliberate: it keeps
-every figure in this document exactly reproducible by a third party, and avoids
-implying a market-data licence this project does not hold.
-
-**The methods are real. The prices are not.** Cost figures are round,
-illustrative planning assumptions — a family would substitute their own
-institution's published cost of attendance.
-
-Model limitations are documented in [`DERIVATION.md` §5](./DERIVATION.md#5-limitations-of-the-model),
-including that i.i.d. returns almost certainly **understate** tail risk.
-
-**This is not financial advice.**
+- **Fees are reference figures** for the 2025–26 cycle, each linked to its source on the
+  [Method](https://finhubtracker-maudung.vercel.app/method) page. They change every year,
+  several vary by country, and colleges set their own application fees and deposits.
+  The visa integrity fee was enacted in 2025 but how and when it is collected has
+  varied, so it enters as a 50% contingency: confirm it with the consulate.
+- **The probabilities are the student's own.** The planner does the arithmetic on that
+  belief; it has no data with which to check it.
+- **The example applicant is invented**, and the market lab is simulated.
+- **This is not financial advice.**
 
 ---
 

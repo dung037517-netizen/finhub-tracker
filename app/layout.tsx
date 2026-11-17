@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { SITE_URL } from "@/lib/site";
 import { THEME_BOOTSTRAP_SCRIPT } from "@/lib/theme";
 
 import "./globals.css";
@@ -20,11 +21,9 @@ const jetbrainsMono = JetBrains_Mono({
 
 const TITLE = "FinHub Tracker — Student Finance Planning Web App";
 const DESCRIPTION =
-  "Plan four years of college costs the way an actuary would: tuition inflated forward, savings " +
-  "accumulated as an annuity-due, then drawn down semester by semester — and stress-tested with " +
-  "Monte Carlo shortfall risk, Value at Risk and Black-Scholes analytics. Computed entirely in " +
-  "the browser by a typed, tested engine with no financial libraries.";
-const SITE_URL = "https://finhubtracker-maudung.vercel.app";
+  "A budgeting, savings-goal and cash-flow planner for students, built on the real cost structure " +
+  "of a U.S. college application: tests, score reports, application fees, financial-aid forms, the " +
+  "enrollment deposit and the visa, each in the month it falls due and in your own currency.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -38,23 +37,22 @@ export const metadata: Metadata = {
   creator: "Dung Nguyen",
   keywords: [
     "student finance planning",
+    "college application costs",
+    "student budget planner",
+    "savings goals",
+    "cash flow planning",
+    "CSS Profile fee",
+    "international student costs",
     "college savings calculator",
-    "529 projection",
-    "tuition inflation",
     "Monte Carlo simulation",
-    "Value at Risk",
-    "expected shortfall",
-    "Black-Scholes",
-    "option Greeks",
     "actuarial science",
-    "quantitative finance",
   ],
   alternates: { canonical: "/" },
   openGraph: {
     title: TITLE,
     description:
-      "A four-year college funding plan modelled with real actuarial mathematics — inflation-" +
-      "adjusted cash flows, annuity-due accumulation, and Monte Carlo shortfall risk.",
+      "Budget, save and plan cash flow for a U.S. college application, with every fee in the " +
+      "month it falls due.",
     url: SITE_URL,
     siteName: "FinHub Tracker",
     type: "website",
@@ -64,8 +62,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: TITLE,
     description:
-      "College funding modelled with actuarial mathematics: inflation-adjusted cash flows, " +
-      "annuity-due accumulation, and Monte Carlo shortfall risk.",
+      "Budget, save and plan cash flow for a U.S. college application, fee by fee.",
   },
   robots: {
     index: true,
@@ -90,10 +87,10 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}>
         <a
-          href="#markets"
+          href="#main"
           className="sr-only rounded-md bg-primary px-4 py-2 text-primary-foreground focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50"
         >
-          Skip to the dashboard
+          Skip to the main content
         </a>
         <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
       </body>

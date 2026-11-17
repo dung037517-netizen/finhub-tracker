@@ -1,8 +1,8 @@
 # Actuarial Derivations
 
 > **What this document is.** A study document. I am working through the actuarial
-> mathematics behind `lib/college-plan.ts` until I can reproduce each result
-> unaided. Where a derivation is standard actuarial material — and most of it is —
+> mathematics behind `lib/college-plan.ts` and, since version 2, `lib/planner/`
+> until I can reproduce each result unaided. Where a derivation is standard actuarial material — and most of it is —
 > I say so rather than implying I discovered it.
 > See [How This Was Built](./README.md#how-this-was-built--transparency-statement).
 
@@ -373,6 +373,152 @@ limitations section has not been validated.
 
 ---
 
+## 6. The application-year planner
+
+Version 2 adds a planner for the year before enrollment (`lib/planner/`). Its
+mathematics is simpler than the funding engine's — no interest, no stochastic
+returns — but four results in it are worth working through, because each is the
+reason the code does what it does.
+
+### 6.1 The cost of applying as an individual risk model
+
+Let $B$ be the certain, unpaid cost, and let contingency $j = 1, \dots, k$ cost
+$c_j$ with probability $p_j$. Items that happen together — the regular-round
+applications, their score reports and CSS Profiles, all needed only if Early
+Decision fails — are merged into one contingency first, so the indicators below
+are independent across contingencies and move together within one:
+
+$$T = B + \sum_{j=1}^{k} c_j X_j, \qquad X_j \sim \text{Bernoulli}(p_j).$$
+
+This is the **individual risk model** $S = \sum_i I_i B_i$ of loss models, with
+the benefit $B_i$ fixed at $c_j$. Linearity and independence give
+
+$$\mathbb{E}[T] = B + \sum_j p_j c_j, \qquad \operatorname{Var}[T] = \sum_j p_j (1 - p_j)\, c_j^2 .$$
+
+**The exact distribution.** Each subset $A \subseteq \{1, \dots, k\}$ of
+contingencies that occur is one outcome, with
+
+$$\mathbb{P}(A) = \prod_{j \in A} p_j \prod_{j \notin A} (1 - p_j), \qquad T(A) = B + \sum_{j \in A} c_j .$$
+
+`costDistribution` enumerates all $2^k$ subsets as bit masks, merges outcomes
+with equal totals and sorts them. The work is $O(k\,2^k)$: at the cap of
+$k = 14$, about 230,000 steps. Beyond the cap the smallest contingencies enter
+at their expected value, which keeps the mean exact and slightly narrows the
+distribution.
+
+The percentile is the generalized inverse
+$t_{0.9} = \min\{\, t : \mathbb{P}(T \le t) \ge 0.9 \,\}$, and the **risk margin**
+is $t_{0.9} - \mathbb{E}[T]$ — the same idea as the Risk Margin of §4.5, on a
+smaller scale.
+
+**Why not the normal approximation.** The central limit theorem justifies
+$t_{0.9} \approx \mathbb{E}[T] + z_{0.9}\,\sigma_T$ for many small, similar
+risks, such as a portfolio of policies. An application year has a handful of
+large ones. The example plan, as built on 16 November 2026, has three, on a
+certain base $B = \$1{,}551$:
+
+| Contingency | $c_j$ | $p_j$ |
+|---|---:|---:|
+| Regular round, if Early Decision fails | $1,021 | 0.75 |
+| Visa integrity fee, if collected | $250 | 0.50 |
+| SAT retake, if the score falls short | $111 | 0.40 |
+
+Then $\mathbb{E}[T] = \$2{,}486.15$ and
+
+$$\sigma_T^2 = 0.1875 \cdot 1021^2 + 0.25 \cdot 250^2 + 0.24 \cdot 111^2 = 214{,}039.73, \qquad \sigma_T = \$462.64 .$$
+
+The eight outcomes, in order:
+
+| Contingencies that occur | Total | Probability | Cumulative |
+|---|---:|---:|---:|
+| none | $1,551 | 0.075 | 0.075 |
+| retake | $1,662 | 0.050 | 0.125 |
+| visa fee | $1,801 | 0.075 | 0.200 |
+| visa fee, retake | $1,912 | 0.050 | 0.250 |
+| regular round | $2,572 | 0.225 | 0.475 |
+| regular round, retake | $2,683 | 0.150 | 0.625 |
+| regular round, visa fee | $2,822 | 0.225 | 0.850 |
+| all three | $2,933 | 0.150 | 1.000 |
+
+The cumulative probability first reaches 0.9 in the last row, so
+$t_{0.9} = \$2{,}933$: the honest answer is to hold enough for everything. The
+normal approximation gives $2{,}486.15 + 1.2816 \times 462.64 = \$3{,}079$,
+**$146 more than the largest total that can occur.** Here it errs on the
+cautious side; with other probabilities it errs on the other. A method that can
+return an impossible number should not set a reserve, so the planner enumerates.
+A test pins every figure in this example.
+
+### 6.2 The smallest level saving, and the binding month
+
+The cash flow carries no interest: application money is held in cash for less
+than a year. Let $S_t$ be the projected balance at the end of month
+$t = 1, \dots, n$. Saving an extra $m$ at the start of every month from now adds
+$t\,m$ to $S_t$.
+
+**Claim.** The smallest $m \ge 0$ with $S_t + t\,m \ge 0$ for every $t$ is
+
+$$m^{*} = \max\Big(0,\ \max_{1 \le t \le n} \frac{-S_t}{t}\Big).$$
+
+*Proof.* Because $t > 0$, the constraint for month $t$ is equivalent to
+$m \ge -S_t / t$. The feasible set is the intersection of the half-lines
+$[-S_t/t, \infty)$ with $[0, \infty)$, which is the half-line $[m^*, \infty)$,
+and its least element is $m^*$. $\square$
+
+The month $t^\ast$ that attains the inner maximum is the **binding month**. Two
+consequences shape the interface:
+
+- **Timing beats totals.** A deficit $D$ in month $t$ needs $D/t$ a month. The
+  same deficit costs four times as much a month in month 2 as in month 8.
+- **Only one month matters at a time.** Every other constraint is slack at
+  $m^*$. Only a change that raises the balance in the binding month — moving a
+  payment later, or income earlier — lowers $m^*$, until another month binds.
+
+With interest at a monthly rate $j$, the extra balance at the end of month $t$
+is $m\,\ddot{s}_{\overline{t}\rvert j}$ rather than $t\,m$, and the same argument
+gives $m^* = \max\big(0, \max_t -S_t / \ddot{s}_{\overline{t}\rvert j}\big)$ —
+the annuity-due of §2 again, and $\ddot{s}_{\overline{t}\rvert 0} = t$. At 5% a
+year, over eight months, the difference is under 2% of $m^*$, which is why the
+planner leaves interest out.
+
+### 6.3 Exchange-rate stress
+
+A cost of $c$ dollars at $r$ home units per dollar, with the dollar assumed $s$
+stronger, costs $c\,r\,(1+s)$ at home. Write the balance at the end of month $t$
+as $S_t(s) = a_t - (1+s)\,b_t$, where $b_t \ge 0$ is the cumulative home cost at
+rate $r$ of the dollar items due by month $t$, non-decreasing in $t$. The lowest
+balance
+
+$$L(s) = \min_t S_t(s)$$
+
+is a minimum of affine functions of $s$, hence **concave and piecewise linear**,
+with slope $-b_{t^\ast(s)}$. As $s$ grows the slope can only fall, so the
+minimizing month can only move to one with a larger $b_t$ — a later month. The
+lowest balance therefore falls at least linearly, and faster after each switch,
+which is why the planner re-runs the whole projection at each stress rather than
+scaling one result.
+
+### 6.4 Savings goals
+
+For a goal with target $G$, amount saved $V$ and $n$ months left including the
+current one, the level amount that arrives exactly on time is $(G - V)/n$. At a
+monthly contribution $c$ the goal is reached in month $\lceil (G - V)/c \rceil$,
+counting this one as the first, and the shortfall at the deadline is
+$\max(0,\ G - V - n\,c)$. The cash flow deducts each contribution in exactly the
+months the goal is open, so the two views cannot disagree.
+
+### 6.5 Limitations of the planner
+
+1. **Independence across contingencies.** A student who needs a retake may also
+   be less likely to be admitted early. That positive dependence would fatten the
+   upper tail, so the 90th percentile here is, if anything, optimistic.
+2. **The probabilities are the student's own,** and nothing checks them against
+   data.
+3. **No interest, and one exchange rate** apart from the stress (§6.2, §6.3).
+4. **Fees are reference figures** for the 2025–26 cycle. The visa integrity fee
+   enters as a 50% contingency because how and when it is collected has varied.
+
+---
+
 ## References
 
 - Bowers, Gerber, Hickman, Jones & Nesbitt, *Actuarial Mathematics*, 2nd ed. —
@@ -385,3 +531,5 @@ limitations section has not been validated.
 - Hull, *Options, Futures, and Other Derivatives* — lognormal drift correction
 - EIOPA, *Solvency II Delegated Regulation* — Risk Margin, Technical Provisions
 - Burden & Faires, *Numerical Analysis* — bisection convergence guarantees
+- Klugman, Panjer & Willmot, *Loss Models: From Data to Decisions* — the
+  individual risk model and aggregate loss distributions (§6.1)

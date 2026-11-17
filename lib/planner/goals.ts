@@ -6,9 +6,10 @@
 import { addMonths, monthsBetween } from "@/lib/planner/months";
 import type { Goal, Month } from "@/types/planner";
 
-export type GoalState = "reached" | "on-track" | "behind" | "overdue";
+export type GoalState = "unset" | "reached" | "on-track" | "behind" | "overdue";
 
 export const GOAL_STATE_LABELS: Readonly<Record<GoalState, string>> = {
+  unset: "No target yet",
   reached: "Reached",
   "on-track": "On track",
   behind: "Behind",
@@ -36,9 +37,13 @@ export interface GoalStatus {
  * month from `now` up to and including the deadline month.
  */
 export function goalStatus(goal: Goal, now: Month): GoalStatus {
-  const remaining = Math.max(0, goal.target - goal.saved);
   const monthsLeft = Math.max(0, monthsBetween(now, goal.deadline) + 1);
-  const progress = goal.target > 0 ? Math.min(1, goal.saved / goal.target) : 1;
+  if (!(goal.target > 0)) {
+    // Nothing to measure against yet: not reached, not behind.
+    return { goal, remaining: 0, monthsLeft, requiredMonthly: 0, progress: 0, projectedMonth: null, shortfallAtDeadline: 0, state: "unset" };
+  }
+  const remaining = Math.max(0, goal.target - goal.saved);
+  const progress = Math.min(1, goal.saved / goal.target);
 
   if (remaining === 0) {
     return { goal, remaining, monthsLeft, requiredMonthly: 0, progress: 1, projectedMonth: now, shortfallAtDeadline: 0, state: "reached" };
@@ -56,6 +61,6 @@ export function goalStatus(goal: Goal, now: Month): GoalStatus {
 export function monthlyGoalCommitment(goals: readonly Goal[], now: Month): number {
   return goals.reduce((total, goal) => {
     const status = goalStatus(goal, now);
-    return status.state === "reached" || status.monthsLeft === 0 ? total : total + goal.monthly;
+    return status.state === "reached" || status.state === "unset" || status.monthsLeft === 0 ? total : total + goal.monthly;
   }, 0);
 }

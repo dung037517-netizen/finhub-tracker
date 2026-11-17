@@ -81,7 +81,8 @@ function incomeIn(plan: PlanState, month: Month): number {
 }
 
 function goalContribution(goal: Goal, month: Month): number {
-  if (goal.saved >= goal.target) return 0;
+  // Same rule as the Goals tab: no target, or already reached, takes nothing.
+  if (!(goal.target > 0) || goal.saved >= goal.target) return 0;
   return monthIndex(month) <= monthIndex(goal.deadline) ? goal.monthly : 0;
 }
 

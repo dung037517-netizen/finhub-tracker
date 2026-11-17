@@ -90,7 +90,7 @@ export function buildSamplePlan(now: number): PlanState {
     usdRate: 26_000,
     startMonth,
     entryMonth: defaultEntryMonth(startMonth),
-    openingBalance: 12_000_000,
+    openingBalance: 35_000_000,
     fxStressPct: 0,
   };
   const laptopDeadline = addMonths(settings.entryMonth, -1);
@@ -108,7 +108,7 @@ export function buildSamplePlan(now: number): PlanState {
     budget: SAMPLE_BUDGET.map(([category, monthly], index) => ({ id: `budget-${index + 1}`, category, monthly })),
     transactions: sampleTransactions(startMonth, dateOfTimestamp(now)),
     goals: [
-      { id: "goal-laptop", name: "Laptop for university", target: 25_000_000, saved: 9_000_000, deadline: laptopDeadline, monthly: 1_500_000 },
+      { id: "goal-laptop", name: "Laptop for university", target: 25_000_000, saved: 9_000_000, deadline: laptopDeadline, monthly: 2_000_000 },
       { id: "goal-flight", name: "Flight to the U.S.", target: 30_000_000, saved: 4_000_000, deadline: flightDeadline, monthly: 2_000_000 },
     ],
   };

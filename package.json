@@ -1,8 +1,8 @@
 {
   "name": "finhub-tracker",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Quantitative Risk Analytics & Portfolio Dashboard",
+  "description": "Student finance planning: budgeting, savings goals and cash-flow planning on the cost structure of U.S. college applications",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
