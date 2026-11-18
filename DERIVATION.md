@@ -338,9 +338,9 @@ Artzner et al. (1999). A coherent risk measure must satisfy monotonicity,
 translation invariance, positive homogeneity and **subadditivity**; VaR fails the
 last. CTE satisfies all four.
 
-This is why Solvency II and the Swiss Solvency Test are built on expected
-shortfall, and why the SOA syllabus teaches CTE rather than VaR as the primary
-tail measure.
+This is why the Swiss Solvency Test is built on expected shortfall. Solvency II,
+by contrast, calibrates its capital requirement to a 99.5% VaR, so the choice
+between the two measures is a regulatory one as much as a mathematical one.
 
 Practically: a 5% chance of a \$2,000 deficit and a 5% chance of a \$90,000
 deficit have **identical VaR** and utterly different CTE. Reporting only VaR

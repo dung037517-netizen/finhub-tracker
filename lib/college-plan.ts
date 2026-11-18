@@ -483,8 +483,8 @@ export function requiredMonthlyContribution(input: CollegePlanInput): number {
  * Reporting only the first is the classic error: a 5% chance of a $2,000 gap and
  * a 5% chance of a $90,000 gap are the same number and utterly different
  * situations. VaR and TVaR at 95% are included for the same reason — TVaR is
- * **subadditive** and therefore coherent, which is why Solvency II is built on
- * expected shortfall rather than on VaR.
+ * **subadditive** and therefore coherent, which is why the Swiss Solvency Test
+ * uses expected shortfall (Solvency II itself calibrates capital to a 99.5% VaR).
  *
  * @param paths Number of simulated futures. 1,200 gives percentile bands stable
  *              to roughly ±1% while remaining fast enough to re-run interactively.

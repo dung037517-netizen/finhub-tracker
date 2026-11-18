@@ -499,8 +499,8 @@ function VarPanel({ returns, portfolioValue }: VarPanelProps) {
             {"\\mathrm{TVaR}_\\alpha = -\\mathbb{E}\\!\\left[R \\mid R \\le -\\mathrm{VaR}_\\alpha\\right]"}
           </Latex>
           <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-            TVaR is subadditive and therefore coherent; VaR is not, which is why Solvency II and
-            the Swiss Solvency Test are built on the expected shortfall instead.
+            TVaR is subadditive and therefore coherent; VaR is not. The Swiss Solvency Test uses
+            the expected shortfall for this reason, while Solvency II calibrates capital to a 99.5% VaR.
           </p>
         </div>
       </div>
